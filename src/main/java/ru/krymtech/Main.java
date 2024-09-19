@@ -1,13 +1,11 @@
 package ru.krymtech;
 
-import org.xml.sax.Attributes;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
-
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
+import javax.xml.stream.XMLEventReader;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.events.EndElement;
+import javax.xml.stream.events.StartElement;
+import javax.xml.stream.events.XMLEvent;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
@@ -28,56 +26,41 @@ import java.nio.file.Paths;
 public class Main {
     public static final String XML_FILENAME = "src/main/resources/forbidden_symbols.xml";
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, XMLStreamException {
         byte[] bytes = Files.readAllBytes(Paths.get(XML_FILENAME));
         String fileString = new String(bytes, StandardCharsets.UTF_8);
         fileString = replaceXmlSymbols(fileString);
         System.out.println(fileString);
     }
 
-    public static String replaceXmlSymbols(String input) {
-        CorrectionHandler correctionHandler = new CorrectionHandler();
-        try {
-            SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
-            parser.parse(new InputSource(new StringReader(input)), correctionHandler);
-        } catch (ParserConfigurationException | IOException | SAXException e) {
-            System.out.println("Failed to parse XML: " + e.getMessage());
-        }
-        return correctionHandler.getCorrectedXml();
-    }
-
-    private static class CorrectionHandler extends DefaultHandler {
-        private final StringBuilder sb = new StringBuilder();
-
-        @Override
-        // Doesn't work = it throws SAXException and stops parsing w/o possibility to continue XML assembling
-        public void characters(char[] ch, int start, int length) {
-            String content = new String(ch, start, length);
-            for (char c : content.toCharArray())
-                sb.append((c == '<' || c == '>' || c == '&' || c == '\"' || c == '\'' || c == ':') ? '_' : c);
-        }
-
-        @Override
-        public void ignorableWhitespace(char[] ch, int start, int length) {
-            sb.append(ch, start, length);
-        }
-
-        @Override
-        public void startElement(String uri, String localName, String qName, Attributes attributes) {
-            sb.append("<").append(qName);
-            for (int i = 0; i < attributes.getLength(); i++) {
-                sb.append(" ").append(attributes.getQName(i)).append("=\"").append(attributes.getValue(i)).append("\"");
+    public static String replaceXmlSymbols(String input) throws XMLStreamException {
+        StringBuilder sb = new StringBuilder(input.length() * 2);
+        XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
+        XMLEventReader reader = xmlInputFactory.createXMLEventReader(new StringReader(input));
+        StartElement startElement;
+        EndElement endElement;
+        String elementData;
+        while (reader.hasNext()) {
+            try {
+                XMLEvent nextEvent = reader.nextEvent();
+                if (nextEvent.isStartElement()) {
+                    startElement = nextEvent.asStartElement();
+                    sb.append("<").append(startElement.getName()).append(">");
+                }
+                if (nextEvent.isEndElement()) {
+                    endElement = nextEvent.asEndElement();
+                    sb.append("<").append(endElement.getName()).append(">");
+                }
+                if (nextEvent.isCharacters()) {
+                    elementData = nextEvent.asCharacters().getData();
+                    for (char c : elementData.toCharArray())
+                        sb.append((c == '<' || c == '>' || c == '&' || c == '\"' || c == '\'' || c == ':') ? '_' : c);
+                }
+            } catch (XMLStreamException e) {
+                System.out.println(e.getMessage());
+                break;  // if no break, then error is bypassed and caught into a endless loop
             }
-            sb.append(">");
         }
-
-        @Override
-        public void endElement(String uri, String localName, String qName) {
-            sb.append("</").append(qName).append(">");
-        }
-
-        public String getCorrectedXml() {
-            return sb.toString();
-        }
+        return sb.toString();
     }
 }
