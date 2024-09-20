@@ -3,10 +3,6 @@ package ru.krymtech;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /*
  * Использованы материалы из RFC и w3.org:
@@ -19,15 +15,8 @@ import java.util.regex.Pattern;
  * Unicode Characters: XML supports a vast range of Unicode characters beyond the basic Latin alphabet, allowing representation of various languages, symbols, and emojis.
  */
 
-/* XML is not a regular language. It cannot be parsed using a regular expression.
- * An expression would work will break when it gets nested tags,
- * then if fixed that it will break on XML comments, CDATA sections, processor directives, namespaces, ...
- */
-
 public class Main {
     public static final String XML_FILENAME = "src/main/resources/forbidden_symbols.xml";
-    private static final Pattern p = Pattern.compile("<(.+)>(.+)</\\1>");
-    private static final Queue<String> tree = new LinkedList<>();
 
     public static void main(String[] args) throws IOException {
         String fileString = reduce(Files.readString(Paths.get(XML_FILENAME)));
@@ -36,30 +25,27 @@ public class Main {
     }
 
     public static String replaceXmlSymbols(String input) {
-        Matcher m = p.matcher(input);
-        recurse(m, input);
-        StringBuilder sb = new StringBuilder();
-        for (String s : tree) sb.append(s);
-        return sb.toString();
-    }
-
-    private static void recurse(Matcher m, String next) {
-        String tag = "";
-        String inner = next;
-        if (m.find()) {
-            tag = m.group(1);
-            tree.add("<" + tag + ">");
-            inner = m.group(2);
-            recurse(m, inner);
-        } else {
-            inner = inner
-                    .replaceAll("<" + tag + ">", "")
-                    .replaceAll("</" + tag + ">", "")
-                    .replaceAll("[&:'\"]", "_");
-            tree.add(inner);
+        StringBuilder xml = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            if (i < input.length() - 1
+                    && input.charAt(i) == '>'
+                    && input.charAt(i + 1) != '<') {
+                xml.append(input.charAt(i));
+                StringBuilder tagContent = new StringBuilder();
+                int j = i + 1;
+                for (; input.charAt(j) != '<'
+                        && input.charAt(j + 1) != '/'
+                        && j < input.length() - 2; j++) {
+                    tagContent.append(input.charAt(j));
+                }
+                String corrected = tagContent.toString().replaceAll("[&<>':\"]", "_");
+                xml.append(corrected).append(input.charAt(j));
+                i = j;
+                continue;
+            }
+            xml.append(input.charAt(i));
         }
-        if (!tag.isBlank())
-            tree.add("</" + tag + ">");
+        return xml.toString();
     }
 
     public static String reduce(String xml) {
