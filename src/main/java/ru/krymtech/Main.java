@@ -1,16 +1,12 @@
 package ru.krymtech;
 
-import javax.xml.stream.XMLEventReader;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.events.EndElement;
-import javax.xml.stream.events.StartElement;
-import javax.xml.stream.events.XMLEvent;
 import java.io.IOException;
-import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /*
  * Использованы материалы из RFC и w3.org:
@@ -23,44 +19,53 @@ import java.nio.file.Paths;
  * Unicode Characters: XML supports a vast range of Unicode characters beyond the basic Latin alphabet, allowing representation of various languages, symbols, and emojis.
  */
 
+/* XML is not a regular language. It cannot be parsed using a regular expression.
+ * An expression would work will break when it gets nested tags,
+ * then if fixed that it will break on XML comments, CDATA sections, processor directives, namespaces, ...
+ */
+
 public class Main {
     public static final String XML_FILENAME = "src/main/resources/forbidden_symbols.xml";
+    private static final Pattern p = Pattern.compile("<(.+)>(.+)</\\1>");
+    private static final Queue<String> tree = new LinkedList<>();
 
-    public static void main(String[] args) throws IOException, XMLStreamException {
-        byte[] bytes = Files.readAllBytes(Paths.get(XML_FILENAME));
-        String fileString = new String(bytes, StandardCharsets.UTF_8);
+    public static void main(String[] args) throws IOException {
+        String fileString = reduce(Files.readString(Paths.get(XML_FILENAME)));
         fileString = replaceXmlSymbols(fileString);
         System.out.println(fileString);
     }
 
-    public static String replaceXmlSymbols(String input) throws XMLStreamException {
-        StringBuilder sb = new StringBuilder(input.length() * 2);
-        XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
-        XMLEventReader reader = xmlInputFactory.createXMLEventReader(new StringReader(input));
-        StartElement startElement;
-        EndElement endElement;
-        String elementData;
-        while (reader.hasNext()) {
-            try {
-                XMLEvent nextEvent = reader.nextEvent();
-                if (nextEvent.isStartElement()) {
-                    startElement = nextEvent.asStartElement();
-                    sb.append("<").append(startElement.getName()).append(">");
-                }
-                if (nextEvent.isEndElement()) {
-                    endElement = nextEvent.asEndElement();
-                    sb.append("<").append(endElement.getName()).append(">");
-                }
-                if (nextEvent.isCharacters()) {
-                    elementData = nextEvent.asCharacters().getData();
-                    for (char c : elementData.toCharArray())
-                        sb.append((c == '<' || c == '>' || c == '&' || c == '\"' || c == '\'' || c == ':') ? '_' : c);
-                }
-            } catch (XMLStreamException e) {
-                System.out.println(e.getMessage());
-                break;  // if no break, then error is bypassed and caught into a endless loop
-            }
-        }
+    public static String replaceXmlSymbols(String input) {
+        Matcher m = p.matcher(input);
+        recurse(m, input);
+        StringBuilder sb = new StringBuilder();
+        for (String s : tree) sb.append(s);
         return sb.toString();
+    }
+
+    private static void recurse(Matcher m, String next) {
+        String tag = "";
+        String inner = next;
+        if (m.find()) {
+            tag = m.group(1);
+            tree.add("<" + tag + ">");
+            inner = m.group(2);
+            recurse(m, inner);
+        } else {
+            inner = inner
+                    .replaceAll("<" + tag + ">", "")
+                    .replaceAll("</" + tag + ">", "")
+                    .replaceAll("[&:'\"]", "_");
+            tree.add(inner);
+        }
+        if (!tag.isBlank())
+            tree.add("</" + tag + ">");
+    }
+
+    public static String reduce(String xml) {
+        return xml
+                .replaceAll("[\r?\n\t]", "")
+                .replaceAll(">\\s+<", "><")
+                .replaceAll("(<[^/][^>]*>) +| +(</[^>]+>)", "$1$2");
     }
 }
