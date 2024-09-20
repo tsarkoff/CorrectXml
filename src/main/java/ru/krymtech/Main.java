@@ -3,6 +3,8 @@ package ru.krymtech;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.LinkedList;
+import java.util.Queue;
 
 /*
  * Использованы материалы из RFC и w3.org:
@@ -17,41 +19,61 @@ import java.nio.file.Paths;
 
 public class Main {
     public static final String XML_FILENAME = "src/main/resources/forbidden_symbols.xml";
+    public static final String XML_CDATA_FILENAME = "src/main/resources/cdata_symbols.xml";
+    public static final String XML_HEAVY_FILENAME = "src/main/resources/heavy-n-forbidden_symbols.xml";
+    public static final String[] XML_FILENAMES = {XML_FILENAME, XML_HEAVY_FILENAME, XML_CDATA_FILENAME};
+    public static final String REGEX_RESERVED_XML_SYMBOLS = "[\\\\&<>':\"]";
+    public static final String CDATA_ENTRY = "<![CDATA[";
 
     public static void main(String[] args) throws IOException {
-        String fileString = reduce(Files.readString(Paths.get(XML_FILENAME)));
-        fileString = replaceXmlSymbols(fileString);
-        System.out.println(fileString);
+        for (String filename : XML_FILENAMES) {
+            String fileString = Utils.reduce(Files.readString(Paths.get(filename)));
+            fileString = replaceXmlSymbols(fileString);
+            System.out.println("===> Raw XML output:");
+            System.out.println(fileString);
+            System.out.println("===> Pretty XML output:");
+            System.out.println(Utils.prettyXlm(fileString));
+        }
     }
 
     public static String replaceXmlSymbols(String input) {
-        StringBuilder xml = new StringBuilder(input.length());
-        for (int i = 0; i < input.length(); i++) {
-            if (i < input.length() - 1
-                    && input.charAt(i) == '>'
-                    && input.charAt(i + 1) != '<') {
-                xml.append(input.charAt(i));
-                StringBuilder tagContent = new StringBuilder();
-                int j = i + 1;
-                for (; input.charAt(j) != '<'
-                        && input.charAt(j + 1) != '/'
-                        && j < input.length() - 2; j++) {
-                    tagContent.append(input.charAt(j));
-                }
-                String corrected = tagContent.toString().replaceAll("[&<>':\"]", "_");
-                xml.append(corrected).append(input.charAt(j));
-                i = j;
+        StringBuilder sb = new StringBuilder(input.length());
+        Queue<String> queue = new LinkedList<>();
+
+        int i = 0;
+        int lt = 0;
+        int gt = 0;
+        int size = input.length();
+
+        while (i < size) {
+            lt = input.indexOf('<', gt);
+            gt = input.indexOf('>', lt);
+
+            if (input.startsWith(CDATA_ENTRY, lt)) {
+                gt = input.indexOf("]]>", gt);
+                i = gt + 3;
+                queue.add(input.substring(lt, i));
                 continue;
             }
-            xml.append(input.charAt(i));
-        }
-        return xml.toString();
-    }
 
-    public static String reduce(String xml) {
-        return xml
-                .replaceAll("[\r?\n\t]", "")
-                .replaceAll(">\\s+<", "><")
-                .replaceAll("(<[^/][^>]*>) +| +(</[^>]+>)", "$1$2");
+            String ltTag = input.substring(lt + 1, gt);
+            queue.add("<" + ltTag + ">");
+
+            if (lt + ("<" + ltTag + ">").length() >= size)
+                break;
+
+            if (input.charAt(gt + 1) == '<' && input.charAt(gt + 2) != '\\')
+                continue;
+
+            int gtTag = input.indexOf("</" + ltTag + ">", gt);
+            String data = input.substring(gt + 1, gtTag);
+            data = data.replaceAll(REGEX_RESERVED_XML_SYMBOLS, "_");
+            queue.add(data);
+            i = gtTag + ("</" + ltTag + ">").length();
+        }
+
+        for (String s : queue)
+            sb.append(s);
+        return sb.toString();
     }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <comments>
+        <comment><![CDATA[<b>This is a bold string</b>.]]><![CDATA[<i>And this an italic string</i>.]]></comment>
+    </comments>
+</root>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<npexchange xmlns="https://www.example.com/npexchange/3.5" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="3.5">
+    <article id="123" refType="Article">
+        <articleparts>
+            <articlepart id="1234" refType="ArticlePart">
+                <data>
+                    <npdoc xmlns="https://www.example.com/npdoc/2.1" version="2.1" xml:lang="sv_SE">
+                        <body>
+                            <p>Lorem &&&& >>>> &&&& ipsum some random text here.</p>
+                            <p>
+                                <b>Yes \\\\\ ::::: """"" ''''' this is HTML markup, and I would like to keep that.</b>
+                            </p>
+                        </body>
+                        <headline>
+                            <p>I am a headline</p>
+                        </headline>
+                        <leadin>
+                            <p>I am some other text</p>
+                        </leadin>
+                    </npdoc>
+                </data>
+            </articlepart>
+        </articleparts>
+    </article>
+</npexchange>
