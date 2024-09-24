@@ -1,9 +1,8 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<root>
-    <item>
-        This is "FIRST" text with invalid characters >: 'Core' Java & Fundamentals
-    </item>
-    <item>
-        This is "SECOND" text with invalid characters >: 'Core' Java & Fundamentals
-    </item>
-</root>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<article>
+    <data>
+        FIRST reserved symbols &&&& >>>> &&&&
+    </data>
+    <data> SECOND reserved symbols << \\\\\ ::::: """"" '''''
+    </data>
+</article>
